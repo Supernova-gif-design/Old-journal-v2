@@ -1,0 +1,39 @@
+
+:root{ --bg:#110d0a; --parch:#f4ecd8; --ink:#2a1a10; --accent:#7a4b1e; }
+*{box-sizing:border-box}
+body{ margin:0; font-family: Georgia, 'Times New Roman', serif; background: radial-gradient(60% 60% at 20% 15%, #23180f, #0a0806); color:var(--ink);}
+header{ background: linear-gradient(180deg,#2e2016,#1a120c); color:#f3e5d7; padding:28px; text-align:center; border-bottom:1px solid #4b3623; cursor: pointer;}
+header h1{ margin:0 0 6px 0; letter-spacing:1px }
+header .subtitle{ opacity:.85; margin:0 }
+main{ display:flex; gap:18px; max-width:1200px; margin:20px auto; padding:0 18px; }
+aside{ width:280px; background:#1e1510; color:#e9d7c3; border:1px solid #4b3623; border-radius:8px; padding:14px; height:fit-content; position:sticky; top:12px; }
+aside a{ color:#ffdcb3; text-decoration:none }
+.pages{ flex:1 }
+.pages h2{ margin:18px 0 8px; color:#3a2516; background:linear-gradient(180deg,#efe5cd,#e6d6b6); padding:10px 12px; border:1px solid #c8b596; border-radius:6px }
+ol{ list-style:decimal; margin:8px 0 22px 24px; padding:0 }
+ol li{ margin:6px 0 }
+.page-link{ color:#4a2a13; text-decoration:none; border-bottom:1px dashed #a57a4a }
+article{ background:linear-gradient(180deg, rgba(255,252,240,.98), rgba(244,230,204,.98)); padding:24px; border-radius:8px; border:8px solid transparent; box-shadow:0 10px 30px rgba(0,0,0,.5); margin:18px 0 }
+article h1{ margin-top:0 }
+footer{ color:#cdbda8; text-align:center; padding:20px 10px }
+
+/* Locks + Seal + Scare */
+.rune-panel{ margin-top:14px; background:#261a12; border:1px solid #5a3c25; border-radius:8px; padding:10px; }
+.rune-panel input{ width:100%; padding:8px; border:none; border-radius:4px; margin-bottom:6px; }
+.rune-panel button{ width:100%; padding:8px; border:none; border-radius:4px; background:#8b5a2b; color:#fff; cursor:pointer }
+.hint.sm{ opacity:.7; font-size:.9em }
+.locked-tag{ font-size:12px; color:#a36a3a; margin-left:6px; opacity:.9 }
+.locked-link{ opacity:.6; pointer-events:auto; }
+.locked-link:hover{ text-decoration:line-through; }
+
+.seal{ position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:1000; opacity:0; transition:opacity .2s ease; }
+.seal .wax{ width:220px; height:220px; border-radius:50%; background: radial-gradient(#7b2015, #4a0e08); box-shadow: 0 0 40px rgba(255,160,80,.35), inset 0 0 30px rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; color:#f3e0cc; letter-spacing:2px; font-weight:bold; transform: scale(.6) rotate(-6deg); animation: waxpop .9s ease forwards; }
+@keyframes waxpop{ 50%{ transform: scale(1.05) rotate(0deg);} 100%{ transform: scale(.2) rotate(12deg); opacity:0;} }
+.seal.hidden{ display:none; }
+.seal.show{ opacity:1; }
+
+.scare{ position:fixed; inset:0; background:rgba(190,0,0,.0); display:flex; align-items:center; justify-content:center; z-index:1001; transition: background 80ms ease; }
+.scare.hidden{ display:none; }
+.scare.on{ background:rgba(190,0,0,.75); }
+.scare-text{ color:#ffece0; font-size:2rem; text-shadow:0 0 16px #ffb3a3, 0 0 4px #000; opacity:0; transform:scale(.8); transition:opacity 60ms ease, transform 60ms ease; }
+.scare.on .scare-text{ opacity:1; transform:scale(1.04); }

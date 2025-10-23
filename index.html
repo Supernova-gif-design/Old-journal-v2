@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nameless Chronicler – Locked Tome (v9)</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id='sealOverlay' class='seal hidden'><div class='wax'>SEAL LIFTED</div></div>
+<div id='scareOverlay' class='scare hidden'><div class='scare-text'>You're not supposed to be here.</div></div>
+<header>
+  <h1>Nameless Chronicler — Locked Tome</h1>
+  <p class="subtitle">70 pages • rune-locked • enter codes to lift seals</p>
+</header>
+<main>
+  <aside>
+    <h2>Sections</h2>
+    <ul>
+      <li><a href="#planes">Planes</a></li>
+      <li><a href="#field">Field Notes</a></li>
+      <li><a href="#gods">Gods & Corruption</a></li>
+      <li><a href="#monsters">Monster Codex</a></li>
+      <li><a href="#history">Histories</a></li>
+      <li><a href="#secrets">Secrets</a></li>
+      <li><a href="#finale">Finale & Epilogue</a></li>
+    </ul>
+    <div class="rune-panel">
+      <h3>Runes</h3>
+      <input id="runeInput" placeholder="enter rune word">
+      <button id="runeBtn">Enter Rune</button>
+      <p class="hint">Discover runes in play to lift seals.</p>
+      <div class="unlocked">
+        <h4>Unlocked</h4>
+        <ul id="unlockedList"></ul>
+      </div>
+      <p class="hint sm">Tip: click the title 7×, then enter the True Name.</p>
+    </div>
+  </aside>
+  <section class="pages">
+    <h2 id="planes">Planes (15)</h2>
+    <ol id="list-planes"></ol>
+    <h2 id="field">Field Notes (12)</h2>
+    <ol id="list-field"></ol>
+    <h2 id="gods">Gods & Corruption (10)</h2>
+    <ol id="list-gods"></ol>
+    <h2 id="monsters">Monster Codex (14)</h2>
+    <ol id="list-monsters"></ol>
+    <h2 id="history">Histories (12)</h2>
+    <ol id="list-history"></ol>
+    <h2 id="secrets">Secrets (5)</h2>
+    <ol id="list-secrets"></ol>
+    <h2 id="finale">Finale & Epilogue (2)</h2>
+    <ol id="list-finale"></ol>
+  </section>
+</main>
+<footer>
+  <p>v9 • GitHub Pages ready • © Your Table</p>
+</footer>
+<script src="script.js"></script>
+</body>
+</html>
