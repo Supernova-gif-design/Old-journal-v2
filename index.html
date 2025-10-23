@@ -30,6 +30,72 @@
   </style>
 </head>
 <body>
+  <body>
+  <header>
+    <h1>The Nameless Chronicle — Bound Tome</h1>
+    <p class="subtitle">Speak the runes, and the Chronicle shall remember.</p>
+  </header>
+
+  <main>
+    <aside>
+      <h2>Runes</h2>
+      <div class="rune-panel">
+        <input type="text" id="runeInput" placeholder="Enter Rune Word">
+        <button id="runeBtn">Enter Rune</button>
+        <p class="hint sm">Whisper the names of those who fell; truth unlocks the seals.</p>
+      </div>
+    </aside>
+
+    <!-- Book Container -->
+    <section id="chronicleBook" class="book">
+      <div class="book-cover left"></div>
+      <div class="book-pages">
+        <!-- Initial Pages -->
+        <div class="page" data-page="1">
+          <div class="page-front">
+            <h1>The Nameless Chronicle</h1>
+            <p>
+              The tome stirs as you touch it. Dust falls from its leather spine.  
+              Words appear and vanish like ghosts across the parchment.  
+              Somewhere deep inside, a voice asks: *Do you remember my name?*
+            </p>
+          </div>
+        </div>
+
+        <div class="page" data-page="2">
+          <div class="page-front">
+            <h2>Of Realms and Ruin</h2>
+            <p>
+              When the planes began to bleed together, creation itself recoiled.  
+              From the Sea of Air to the Abyssal Deep, gods were corrupted, and  
+              heroes fell beneath the weight of their forgotten oaths.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="book-cover right"></div>
+    </section>
+
+    <!-- Seals and Overlays -->
+    <div id="sealOverlay" class="seal hidden">
+      <div class="rune"></div>
+    </div>
+
+    <div id="scareOverlay" class="scare hidden">
+      <div class="scare-text">You're not supposed to be here.</div>
+    </div>
+  </main>
+
+  <footer>
+    <p>
+      The Chronicle © DM Vaelin Thorne.  
+      <br>“Those who remember the fallen may rewrite the end.”
+    </p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+
   <!-- =========================================================
        HEADER (clickable title; script binds secret behavior)
        ========================================================= -->
