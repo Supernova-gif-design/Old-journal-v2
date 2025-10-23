@@ -1,421 +1,755 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <!-- The Nameless Chronicle — Book Edition -->
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="color-scheme" content="light" />
-  <meta name="theme-color" content="#1a120c" />
-  <title>The Nameless Chronicle — Bound Tome</title>
+/* =======================================================================
+   THE NAMELESS CHRONICLE — INDEX.JS
+   A complete, production-ready controller for your interactive journal.
+   -----------------------------------------------------------------------
+   Features:
+   - 3D Page Flip Engine (click or arrow keys)
+   - Rune Unlock System (with True Name universal unlock)
+   - Seal Animation + Sound on success
+   - Scare System on wrong rune (custom VO + loud scream, 3s red flash)
+   - Ambient Audio (starts on first click)
+   - Dynamic Entry Loader (entries/*.html → new book pages)
+   - Persistent Progress via localStorage
+   - Finale Trigger when all key runes are unlocked
+   - Silent Easter Eggs (no hints shown to players)
+   - Minimal Dev Console (toggle with Shift+~)
+   -----------------------------------------------------------------------
+   Author: Vaelin Thorne (DM)
+   Version: 1.0.0
+   ======================================================================= */
 
-  <!-- Fonts are system serif; you may add custom webfonts if desired -->
-  <link rel="preload" href="assets/images/parchment_bg.jpg" as="image" />
-  <link rel="preload" href="assets/images/seal_glow.png" as="image" />
-  <link rel="stylesheet" href="style.css" />
+(() => {
+  "use strict";
 
-  <!-- Basic SEO & share -->
-  <meta name="description" content="An interactive, rune-locked, page-flipping journal for a multiverse-spanning campaign." />
-  <meta property="og:title" content="The Nameless Chronicle — Bound Tome" />
-  <meta property="og:description" content="An interactive, rune-locked, page-flipping journal for a multiverse-spanning campaign." />
-  <meta property="og:type" content="website" />
-  <meta property="og:image" content="assets/images/parchment_bg.jpg" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <!-- Favicons (optional)
-  <link rel="icon" href="assets/images/favicon.png" type="image/png" />
-  -->
-  <style>
-    /* small inline guard to avoid FOUC on the book spine before style.css loads */
-    .book { opacity: 0; transition: opacity .2s ease; }
-    .book.ready { opacity: 1; }
-  </style>
-</head>
-<body>
-  <body>
-  <header>
-    <h1>The Nameless Chronicle — Bound Tome</h1>
-    <p class="subtitle">Speak the runes, and the Chronicle shall remember.</p>
-  </header>
+  /* ──────────────────────────────────────────────────────────────────────
+     0) CONFIGURATION
+     ──────────────────────────────────────────────────────────────────── */
+  const CFG = {
+    // Rune → files to unlock (relative to /entries/)
+    RUNES: {
+      OCEANUS: ['plane_water_1.html', 'plane_water_2.html', 'plane_water_3.html'],
+      DAWNFALL: ['plane_air_1.html', 'plane_air_2.html', 'plane_air_3.html'],
+      AURIC: ['plane_fire_1.html', 'plane_fire_2.html', 'plane_fire_3.html'],
+      ABYSSAL: ['plane_abyss_1.html', 'plane_abyss_2.html'],
+      TEMPLEVEIL: ['god_koriel_myth.html', 'god_koriel_fall.html'],
+      STORMCROWN: ['secret_stormvault.html', 'field_08.html'],
+      ASTRAEL: ['god_astrael_dream.html', 'god_astrael_corrupt.html'],
+      // VAELINTHORNE (True Name) is handled specially — unlocks everything
+    },
 
-  <main>
-    <aside>
-      <h2>Runes</h2>
-      <div class="rune-panel">
-        <input type="text" id="runeInput" placeholder="Enter Rune Word">
-        <button id="runeBtn">Enter Rune</button>
-        <p class="hint sm">Whisper the names of those who fell; truth unlocks the seals.</p>
-      </div>
-    </aside>
+    ALWAYS_UNLOCKED: new Set([
+      // Allow a few starter pages so the book is always usable
+      'plane_water_1.html', 'plane_water_2.html', 'plane_water_3.html'
+    ]),
 
-    <!-- Book Container -->
-    <section id="chronicleBook" class="book">
-      <div class="book-cover left"></div>
-      <div class="book-pages">
-        <!-- Initial Pages -->
-        <div class="page" data-page="1">
-          <div class="page-front">
-            <h1>The Nameless Chronicle</h1>
-            <p>
-              The tome stirs as you touch it. Dust falls from its leather spine.  
-              Words appear and vanish like ghosts across the parchment.  
-              Somewhere deep inside, a voice asks: *Do you remember my name?*
-            </p>
-          </div>
-        </div>
+    IDS: {
+      book: 'chronicleBook',
+      runeInput: 'runeInput',
+      runeBtn: 'runeBtn',
+      sealOverlay: 'sealOverlay',
+      scareOverlay: 'scareOverlay',
+      title: 'bookTitle' // optional; if present, 7-click secret
+    },
 
-        <div class="page" data-page="2">
-          <div class="page-front">
-            <h2>Of Realms and Ruin</h2>
-            <p>
-              When the planes began to bleed together, creation itself recoiled.  
-              From the Sea of Air to the Abyssal Deep, gods were corrupted, and  
-              heroes fell beneath the weight of their forgotten oaths.
-            </p>
-          </div>
-        </div>
-      </div>
-      <div class="book-cover right"></div>
-    </section>
+    SOUNDS: {
+      ambient: 'assets/sounds/ambient_torch.mp3',
+      seal: 'assets/sounds/fire-effect-367659.mp3',
+      whisper: 'assets/sounds/creepy-whispering-6690.mp3', // optional
+      wrongLine: 'assets/sounds/youre-not-supposed-to-be-here-made-with-Voicemod.mp3',
+      wrongScream: 'assets/sounds/bird-screaming-meme-made-with-Voicemod.mp3',
+      page: 'assets/sounds/page_turn.mp3', // optional
+    },
 
-    <!-- Seals and Overlays -->
-    <div id="sealOverlay" class="seal hidden">
-      <div class="rune"></div>
-    </div>
+    IMAGES: {
+      seal: 'assets/images/seal_glow.png',
+      parchment: 'assets/images/parchment_bg.jpg'
+    },
 
-    <div id="scareOverlay" class="scare hidden">
-      <div class="scare-text">You're not supposed to be here.</div>
-    </div>
-  </main>
+    // Book behaviour
+    PAGE_HEIGHT: 640,
+    FLIP_DURATION_MS: 1100,
 
-  <footer>
-    <p>
-      The Chronicle © DM Vaelin Thorne.  
-      <br>“Those who remember the fallen may rewrite the end.”
-    </p>
-  </footer>
+    // Finale target page
+    FINALE_TARGET: 'entries/true_ending.html',
 
-  <script src="script.js"></script>
-</body>
+    // Easter egg controls (no visible hints)
+    EASTER: {
+      enabled: true,
+      titleClicksForPrompt: 7, // if #bookTitle exists
+      randomWhisperChance: 0.02, // 2% every interval
+      randomWhisperIntervalMs: 13000
+    },
 
-  <!-- =========================================================
-       HEADER (clickable title; script binds secret behavior)
-       ========================================================= -->
-  <header role="banner" aria-label="Journal Header">
-    <h1 id="bookTitle" aria-live="polite" aria-atomic="true">The Nameless Chronicle — Bound Tome</h1>
-    <p class="subtitle">A ledger of planes, gods, and names best left unspoken</p>
-  </header>
+    // Dev mode (console overlay) — toggle with Shift+~
+    DEV: {
+      enabled: false
+    }
+  };
 
-  <!-- =========================================================
-       MAIN: two columns layout (sidebar + book)
-       ========================================================= -->
-  <main role="main" aria-label="Journal Main">
-    <!-- =======================================================
-         SIDEBAR / TABLE OF CONTENTS
-         ======================================================= -->
-    <aside role="complementary" aria-label="Contents">
-      <nav aria-label="Sections and Pages">
-        <h3>Contents</h3>
+  /* ──────────────────────────────────────────────────────────────────────
+     1) STATE
+     ──────────────────────────────────────────────────────────────────── */
+  const State = {
+    bookEl: null,
+    runeInput: null,
+    runeBtn: null,
+    sealOverlay: null,
+    scareOverlay: null,
+    titleEl: null,
 
-        <!-- PLANES -->
-        <h4>Planes</h4>
-        <ol id="toc-planes">
-          <li><a class="toc" href="#" data-file="plane_air_1.html">Plane of Air — Isles of the Unmoored</a></li>
-          <li><a class="toc" href="#" data-file="plane_air_2.html">Plane of Air — The Stormvault</a></li>
-          <li><a class="toc" href="#" data-file="plane_air_3.html">Plane of Air — Ki-rin Ascension Festival</a></li>
-          <li><a class="toc" href="#" data-file="plane_fire_1.html">Plane of Fire — Streets of Brass</a></li>
-          <li><a class="toc" href="#" data-file="plane_fire_2.html">Plane of Fire — Forge of Falling Suns</a></li>
-          <li><a class="toc" href="#" data-file="plane_fire_3.html">Plane of Fire — Before the Ruse</a></li>
-          <li><a class="toc" href="#" data-file="plane_water_1.html">Plane of Water — The Tidal Library</a></li>
-          <li><a class="toc" href="#" data-file="plane_water_2.html">Plane of Water — Leviathan Rites</a></li>
-          <li><a class="toc" href="#" data-file="plane_water_3.html">Plane of Water — Umberlee’s Ransom</a></li>
-          <li><a class="toc" href="#" data-file="plane_earth_1.html">Plane of Earth — Steps of Jotunheim</a></li>
-          <li><a class="toc" href="#" data-file="plane_earth_2.html">Plane of Earth — Tremor Games</a></li>
-          <li><a class="toc" href="#" data-file="plane_earth_3.html">Plane of Earth — Annam’s Silence</a></li>
-          <li><a class="toc" href="#" data-file="plane_shadow_1.html">Shadowfell — Night of Echoes</a></li>
-          <li><a class="toc" href="#" data-file="plane_abyss_1.html">Abyss — The Ninety-Ninth Wound</a></li>
-          <li><a class="toc" href="#" data-file="plane_abyss_2.html">Abyss — Trials of Broken Names</a></li>
-        </ol>
+    pages: [],
+    currentIndex: 0,
+    flipped: new Set(),
 
-        <!-- GODS -->
-        <h4>Gods & Powers</h4>
-        <ol id="toc-gods">
-          <li><a class="toc" href="#" data-file="god_bahamut_myth.html">Bahamut — Myth of Origin</a></li>
-          <li><a class="toc" href="#" data-file="god_bahamut_sundering.html">Bahamut — The Sundering Choice</a></li>
-          <li><a class="toc" href="#" data-file="god_koriel_myth.html">Koriel — Shepherd of Dawn</a></li>
-          <li><a class="toc" href="#" data-file="god_koriel_fall.html">Koriel — Fall to Red Storm</a></li>
-          <li><a class="toc" href="#" data-file="god_umberlee_tithe.html">Umberlee — Tithe of Lighthouses</a></li>
-          <li><a class="toc" href="#" data-file="god_verenestra_mask.html">Verenestra — Mask of Thorns</a></li>
-          <li><a class="toc" href="#" data-file="god_astrael_dream.html">Astrael — Dreamer of Mercy</a></li>
-          <li><a class="toc" href="#" data-file="god_astrael_corrupt.html">Astrael — Quiet Corruption</a></li>
-          <li><a class="toc" href="#" data-file="god_annam_shard.html">Annam — Shard of the All-Father</a></li>
-          <li><a class="toc" href="#" data-file="god_nameless_oath.html">The Nameless Oath</a></li>
-        </ol>
+    ambient: null,
+    sfx: {
+      seal: null,
+      whisper: null,
+      wrongLine: null,
+      wrongScream: null,
+      page: null
+    },
 
-        <!-- MONSTERS -->
-        <h4>Bestiary</h4>
-        <ol id="toc-monsters">
-          <li><a class="toc" href="#" data-file="mon_demogorgon.html">Demogorgon — Prince of Madness</a></li>
-          <li><a class="toc" href="#" data-file="mon_leviathan.html">Leviathan — Typhoon’s Spine</a></li>
-          <li><a class="toc" href="#" data-file="mon_ki_rin.html">Ki-rin — Judgment with Hooves</a></li>
-          <li><a class="toc" href="#" data-file="mon_frostwind_virago.html">Frostwind Virago</a></li>
-          <li><a class="toc" href="#" data-file="mon_illithilich.html">Illithilich — Thought That Forgot Flesh</a></li>
-          <li><a class="toc" href="#" data-file="mon_shadow_dragon.html">Shadow Dragon — Lullaby Eater</a></li>
-          <li><a class="toc" href="#" data-file="mon_brachydios.html">Brachydios — Pressure Made Monster</a></li>
-          <li><a class="toc" href="#" data-file="mon_chorus_of_teeth.html">Chorus of Teeth</a></li>
-          <li><a class="toc" href="#" data-file="mon_archivore.html">Archivore — Eater of Records</a></li>
-          <li><a class="toc" href="#" data-file="mon_weeping_forge.html">The Weeping Forge</a></li>
-          <li><a class="toc" href="#" data-file="mon_fractured_herald.html">Fractured Herald</a></li>
-          <li><a class="toc" href="#" data-file="mon_sea_mourners.html">Sea Mourners</a></li>
-          <li><a class="toc" href="#" data-file="mon_storm_goblin.html">Storm Goblins</a></li>
-          <li><a class="toc" href="#" data-file="mon_jotun_coloss.html">Jotun Coloss — Oath-Bound</a></li>
-        </ol>
+    attempts: 0,
+    sealedHard: false,
 
-        <!-- FIELD NOTES -->
-        <h4>Field Notes</h4>
-        <ol id="toc-field">
-          <li><a class="toc" href="#" data-file="field_01.html">Field Note — 01</a></li>
-          <li><a class="toc" href="#" data-file="field_02.html">Field Note — 02</a></li>
-          <li><a class="toc" href="#" data-file="field_03.html">Field Note — 03</a></li>
-          <li><a class="toc" href="#" data-file="field_04.html">Field Note — 04</a></li>
-          <li><a class="toc" href="#" data-file="field_05.html">Field Note — 05</a></li>
-          <li><a class="toc" href="#" data-file="field_06.html">Field Note — 06</a></li>
-          <li><a class="toc" href="#" data-file="field_07.html">Field Note — 07</a></li>
-          <li><a class="toc" href="#" data-file="field_08.html">Field Note — 08</a></li>
-          <li><a class="toc" href="#" data-file="field_09.html">Field Note — 09</a></li>
-          <li><a class="toc" href="#" data-file="field_10.html">Field Note — 10</a></li>
-          <li><a class="toc" href="#" data-file="field_11.html">Field Note — 11</a></li>
-          <li><a class="toc" href="#" data-file="field_12.html">Field Note — 12</a></li>
-        </ol>
+    // progress
+    totalRequired: 0,
+    unlockedCache: new Set(), // filenames (entries) marked unlocked
+    allUnlockedOnce: false,
+    devConsole: null,
+  };
 
-        <!-- HISTORY -->
-        <h4>History</h4>
-        <ol id="toc-history">
-          <li><a class="toc" href="#" data-file="hist_01.html">Chronicle — 01</a></li>
-          <li><a class="toc" href="#" data-file="hist_02.html">Chronicle — 02</a></li>
-          <li><a class="toc" href="#" data-file="hist_03.html">Chronicle — 03</a></li>
-          <li><a class="toc" href="#" data-file="hist_04.html">Chronicle — 04</a></li>
-          <li><a class="toc" href="#" data-file="hist_05.html">Chronicle — 05</a></li>
-          <li><a class="toc" href="#" data-file="hist_06.html">Chronicle — 06</a></li>
-          <li><a class="toc" href="#" data-file="hist_07.html">Chronicle — 07</a></li>
-          <li><a class="toc" href="#" data-file="hist_08.html">Chronicle — 08</a></li>
-          <li><a class="toc" href="#" data-file="hist_09.html">Chronicle — 09</a></li>
-          <li><a class="toc" href="#" data-file="hist_10.html">Chronicle — 10</a></li>
-          <li><a class="toc" href="#" data-file="hist_11.html">Chronicle — 11</a></li>
-          <li><a class="toc" href="#" data-file="hist_12.html">Chronicle — 12</a></li>
-        </ol>
+  /* ──────────────────────────────────────────────────────────────────────
+     2) UTILITIES
+     ──────────────────────────────────────────────────────────────────── */
+  const U = {
+    $(id) {
+      return document.getElementById(id);
+    },
+    q(sel, root = document) {
+      return root.querySelector(sel);
+    },
+    qa(sel, root = document) {
+      return Array.from(root.querySelectorAll(sel));
+    },
+    delay(ms) {
+      return new Promise(res => setTimeout(res, ms));
+    },
+    log(...args) {
+      if (CFG.DEV.enabled) console.log('[DEV]', ...args);
+      if (State.devConsole) State.devConsole.write(args.map(String).join(' '));
+    },
+    warn(...args) {
+      console.warn('[Chronicle]', ...args);
+      if (State.devConsole) State.devConsole.write('[WARN] ' + args.map(String).join(' '));
+    },
+    ensureAssets() {
+      // cheap preloads
+      const img = new Image();
+      img.src = CFG.IMAGES.seal;
+      const img2 = new Image();
+      img2.src = CFG.IMAGES.parchment;
+    },
+    // Local storage helpers
+    _key(file) { return 'u_' + file; },
+    isUnlocked(file) {
+      if (CFG.ALWAYS_UNLOCKED.has(file)) return true;
+      return localStorage.getItem(U._key(file)) === '1';
+    },
+    unlock(file) {
+      localStorage.setItem(U._key(file), '1');
+      State.unlockedCache.add(file);
+    },
+    unlockMany(list) {
+      list.forEach(U.unlock);
+    },
+    unlockAllKnown() {
+      const all = new Set();
+      Object.values(CFG.RUNES).forEach(arr => arr.forEach(f => all.add(f)));
+      all.forEach(U.unlock);
+      State.allUnlockedOnce = true;
+    },
+    listAllRequired() {
+      const s = new Set();
+      Object.entries(CFG.RUNES).forEach(([rune, arr]) => {
+        if (rune === 'VAELINTHORNE') return; // not a normal requirement
+        arr.forEach(f => s.add(f));
+      });
+      return s;
+    },
+    canFinale() {
+      // All required files from RUNES must be unlocked
+      const req = U.listAllRequired();
+      for (const f of req) {
+        if (!U.isUnlocked(f)) return false;
+      }
+      return true;
+    },
+  };
 
-        <!-- SECRETS -->
-        <h4>Secrets</h4>
-        <ol id="toc-secrets">
-          <li><a class="toc" href="#" data-file="secret_index.html">Hidden Index — Coordinates</a></li>
-          <li><a class="toc" href="#" data-file="secret_stormvault.html">Secret — The Stormvault</a></li>
-          <li><a class="toc" href="#" data-file="secret_astral_greenhouse.html">Secret — Astral Greenhouse</a></li>
-          <li><a class="toc" href="#" data-file="secret_leviathan_grave.html">Secret — Grave of the First Leviathan</a></li>
-          <li><a class="toc" href="#" data-file="secret_forge_of_fallingsuns.html">Secret — Forge of Falling Suns</a></li>
-        </ol>
+  /* ──────────────────────────────────────────────────────────────────────
+     3) AUDIO MANAGER
+     ──────────────────────────────────────────────────────────────────── */
+  const AudioMgr = {
+    init() {
+      try {
+        State.sfx.seal = new Audio(CFG.SOUNDS.seal);
+      } catch (e) { U.warn('Missing seal sound', e); }
+      try {
+        State.sfx.whisper = new Audio(CFG.SOUNDS.whisper);
+      } catch (e) { /* optional */ }
+      try {
+        State.sfx.wrongLine = new Audio(CFG.SOUNDS.wrongLine);
+      } catch (e) { U.warn('Missing wrongLine sound', e); }
+      try {
+        State.sfx.wrongScream = new Audio(CFG.SOUNDS.wrongScream);
+      } catch (e) { U.warn('Missing wrongScream sound', e); }
+      try {
+        State.sfx.page = new Audio(CFG.SOUNDS.page);
+      } catch (e) { /* optional */ }
+    },
+    playAmbientOnce() {
+      if (State.ambient) return;
+      try {
+        const amb = new Audio(CFG.SOUNDS.ambient);
+        amb.loop = true; amb.volume = 0.25;
+        amb.play().catch(()=>{});
+        State.ambient = amb;
+      } catch (e) { U.warn('Ambient failed', e); }
+    },
+    playSeal() {
+      try {
+        if (State.sfx.seal) { State.sfx.seal.currentTime = 0; State.sfx.seal.volume = 0.5; State.sfx.seal.play().catch(()=>{}); }
+      } catch (e) { /* ignore */ }
+    },
+    playWhisper(vol = 0.35) {
+      try {
+        if (State.sfx.whisper) { State.sfx.whisper.currentTime = 0; State.sfx.whisper.volume = vol; State.sfx.whisper.play().catch(()=>{}); }
+      } catch (e) { /* ignore */ }
+    },
+    playPage() {
+      try {
+        if (State.sfx.page) { State.sfx.page.currentTime = 0; State.sfx.page.volume = 0.45; State.sfx.page.play().catch(()=>{}); }
+      } catch (e) { /* ignore */ }
+    },
+    playWrongLine() {
+      try {
+        if (State.sfx.wrongLine) { State.sfx.wrongLine.currentTime = 0; State.sfx.wrongLine.volume = 1.0; State.sfx.wrongLine.play().catch(()=>{}); }
+      } catch (e) { /* ignore */ }
+    },
+    playWrongScream() {
+      try {
+        if (State.sfx.wrongScream) { State.sfx.wrongScream.currentTime = 0; State.sfx.wrongScream.volume = 1.0; State.sfx.wrongScream.play().catch(()=>{}); }
+      } catch (e) { /* ignore */ }
+    },
+    squareBlast() {
+      // fallback blast if audio blocked
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        const ctx = new Ctx();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'square'; o.frequency.value = 220;
+        g.gain.setValueAtTime(0.0001, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(1.0, ctx.currentTime + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.45);
+        o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.48);
+      } catch (e) { /* ignore */ }
+    }
+  };
 
-        <!-- FINALE -->
-        <h4>Final Pages</h4>
-        <ol id="toc-finale">
-          <li><a class="toc" href="#" data-file="seal_finale.html">Finale — The Book Looks Back</a></li>
-          <li><a class="toc" href="#" data-file="true_ending.html">Epilogue — Verdant Expanse</a></li>
-        </ol>
-      </nav>
+  /* ──────────────────────────────────────────────────────────────────────
+     4) OVERLAYS (SEAL + SCARE)
+     ──────────────────────────────────────────────────────────────────── */
+  const Overlays = {
+    showSeal() {
+      if (!State.sealOverlay) return;
+      State.sealOverlay.classList.remove('hidden');
+      // ensure .show triggers transition
+      requestAnimationFrame(() => State.sealOverlay.classList.add('show'));
+      AudioMgr.playSeal();
+      setTimeout(() => {
+        State.sealOverlay.classList.remove('show');
+        setTimeout(() => State.sealOverlay.classList.add('hidden'), 700);
+      }, 1200);
+    },
+    async scare() {
+      if (!State.scareOverlay) return;
 
-      <!-- Rune input (minimal, no hints revealed) -->
-      <section class="rune-panel" aria-label="Rune Entry">
-        <label for="runeInput" class="visually-hidden">Enter Rune</label>
-        <input id="runeInput" inputmode="text" autocomplete="off" spellcheck="false" placeholder="enter rune" />
-        <button id="runeBtn" type="button" aria-label="Submit Rune">Enter</button>
-        <!-- no explicit hints here by request -->
-      </section>
-    </aside>
+      // Flash ON
+      State.scareOverlay.classList.remove('hidden');
+      State.scareOverlay.classList.add('on');
 
-    <!-- =======================================================
-         BOOK CONTAINER
-         ======================================================= -->
-    <section class="pages" aria-label="Book">
-      <div class="book" id="chronicleBook" aria-live="polite" aria-relevant="additions">
-        <!-- First spread (cover & frontispiece) -->
-        <div class="page" id="p0" role="article" aria-label="Cover">
-          <h1>Cover</h1>
-          <p>The clasps are black iron, cold to the touch. Leather creaks as the spine breathes. The page edges are dark with travel.</p>
-          <p>Ink stains the margin where a hand once trembled. Fibers in the parchment rise and fall like tide under skin.</p>
-          <p>Nothing watches. Everything listens.</p>
-        </div>
+      // Play “You’re not supposed to be here” (custom VO)
+      AudioMgr.playWrongLine();
 
-        <div class="page" id="p1" role="article" aria-label="Frontispiece">
-          <h1>Frontispiece</h1>
-          <p>The Chronicle records those who walk between storms. Names etched here rarely survive the retelling, yet the path requires them still.</p>
-          <p>Open gently; the bindings remember strain. The words will find their places as you go.</p>
-        </div>
+      // After ~1s, the very loud scream
+      setTimeout(() => {
+        AudioMgr.playWrongScream();
+      }, 1000);
 
-        <!-- Optional pre-inserted initial content pages -->
-        <div class="page" id="p2" role="article" aria-label="Preface">
-          <h1>Preface</h1>
-          <p>This bound tome gathers strands from sea-salt wake and fire-lit anvil, from high cloud and stone-root. The script is patient. The reader, moreso.</p>
-          <p>Turn a page to begin. Turn another to continue.</p>
-        </div>
+      // Keep red flash for ~3s, then fade out
+      setTimeout(() => {
+        State.scareOverlay.classList.remove('on');
+        setTimeout(() => State.scareOverlay.classList.add('hidden'), 1000);
+      }, 3000);
 
-        <div class="page" id="p3" role="article" aria-label="How This Tome Works">
-          <h1>How This Tome Works</h1>
-          <ul>
-            <li>Click a visible page to turn forward; click the left page edge to turn back.</li>
-            <li>Use arrow keys (→ / ←) to navigate, if preferred.</li>
-            <li>Selecting an entry on the left adds a new page to the book.</li>
-            <li>Some pages are sealed. The spine is patient.</li>
-          </ul>
-        </div>
-      </div>
+      // Fallback blast if both audio calls fail
+      setTimeout(() => AudioMgr.squareBlast(), 1200);
+    }
+  };
 
-      <!-- Overlays (fallback if script injects its own, these exist and remain hidden) -->
-      <div class="seal hidden" id="sealOverlay" aria-hidden="true"><div class="rune"></div></div>
-      <div class="scare hidden" id="scareOverlay" aria-hidden="true"><div class="scare-text">You're not supposed to be here.</div></div>
-    </section>
-  </main>
+  /* ──────────────────────────────────────────────────────────────────────
+     5) BOOK ENGINE (3D FLIP)
+     ──────────────────────────────────────────────────────────────────── */
+  const Book = {
+    init() {
+      State.bookEl = U.$(CFG.IDS.book);
+      if (!State.bookEl) {
+        U.warn('Missing #chronicleBook element');
+        return;
+      }
 
-  <!-- =========================================================
-       FOOTER
-       ========================================================= -->
-  <footer role="contentinfo" aria-label="Journal Footer">
-    <p>© The Nameless Chronicle — a journal for a long journey between planes.</p>
-  </footer>
+      // collect pages (direct children with .page)
+      State.pages = U.qa('.page', State.bookEl);
+      State.pages.forEach((page, i) => {
+        page.style.zIndex = (State.pages.length - i);
+        page.dataset.pageIndex = String(i);
+        page.style.height = CFG.PAGE_HEIGHT + 'px';
+        page.addEventListener('click', () => Book.toggle(i));
+      });
 
-  <!-- =========================================================
-       ACCESSIBILITY HELPERS
-       ========================================================= -->
-  <noscript>
-    <article style="max-width:760px;margin:20px auto;background:rgba(255,252,240,.95);padding:16px;border:1px solid #c8b596;border-radius:6px">
-      <h2>JavaScript Required</h2>
-      <p>This journal flips its pages and unlocks entries using JavaScript. Enable JavaScript to read and navigate the tome.</p>
-    </article>
-  </noscript>
+      document.addEventListener('keydown', e => {
+        if (e.key === 'ArrowRight') Book.next();
+        else if (e.key === 'ArrowLeft') Book.prev();
+      });
+    },
 
-  <!-- Minimal helper for initial ready state (avoids book flicker before CSS finishes) -->
-  <script>
-    document.addEventListener('DOMContentLoaded', function(){
-      var book = document.getElementById('chronicleBook');
-      if(book) requestAnimationFrame(function(){ book.classList.add('ready'); });
-    });
-  </script>
+    toggle(i) {
+      if (State.sealedHard) return;
+      const p = State.pages[i];
+      if (!p) return;
+      const isOpen = p.classList.contains('open');
+      if (isOpen) {
+        p.classList.remove('open');
+        State.flipped.delete(i);
+        State.currentIndex = Math.max(0, State.currentIndex - 1);
+      } else {
+        p.classList.add('open');
+        State.flipped.add(i);
+        State.currentIndex = Math.min(State.pages.length - 1, State.currentIndex + 1);
+      }
+      AudioMgr.playPage();
+    },
 
-  <!-- Main interactivity -->
-  <script src="script.js"></script>
+    next() {
+      if (State.sealedHard) return;
+      if (State.currentIndex < State.pages.length - 1) {
+        Book.toggle(State.currentIndex);
+      }
+    },
 
-  <!-- =========================================================
-       OPTIONAL: LONG COMMENT BLOCK FOR ORGANIZATION & FUTURE NOTES
-       (This section helps keep the file close to ~500 lines.)
-       ========================================================= -->
-  <!--
-  ORGANIZATION NOTES
-  ------------------
-  1) Place all parchment/rune images in: assets/images/
-     - parchment_bg.jpg   (background parchment)
-     - seal_glow.png      (blue rune circle)
-     - cover textures, corner overlays (optional)
-  2) Place all audio in: assets/sounds/
-     - fire-effect-367659.mp3 (ambient or loop)
-     - creepy-whispering-6690.mp3 (seal)
-     - page_turn.mp3 (optional)
-  3) All entry files belong in: entries/
-     Example:
-       plane_air_1.html
-       plane_air_2.html
-       plane_air_3.html
-       plane_fire_1.html
-       plane_fire_2.html
-       plane_fire_3.html
-       plane_water_1.html
-       plane_water_2.html
-       plane_water_3.html
-       plane_earth_1.html
-       plane_earth_2.html
-       plane_earth_3.html
-       plane_shadow_1.html
-       plane_abyss_1.html
-       plane_abyss_2.html
-       ... (custom pages)
-       true_ending.html
+    prev() {
+      if (State.sealedHard) return;
+      if (State.currentIndex > 0) {
+        Book.toggle(State.currentIndex - 1);
+      }
+    },
 
-  4) The script expects TOC anchors with class "toc" and data-file="FILENAME.html".
-     It fetches entries/ + FILENAME.html to build new turnable pages inside the .book.
+    appendEntryPage(title, html) {
+      if (!State.bookEl) return;
+      const page = document.createElement('div');
+      page.className = 'page';
+      page.style.height = CFG.PAGE_HEIGHT + 'px';
+      page.innerHTML = `<h1>${title}</h1>` + html;
+      State.bookEl.appendChild(page);
 
-  5) Lock & Rune behavior:
-     - Some pages appear “locked” until the correct rune is entered.
-     - Locked badges are added/removed by script.
-     - Minimal rune panel at the bottom left (no hints displayed).
+      // rebuild page list and stacks
+      State.pages = U.qa('.page', State.bookEl);
+      State.pages.forEach((p, i) => {
+        p.style.zIndex = (State.pages.length - i);
+        p.dataset.pageIndex = String(i);
+        if (!p._bound) {
+          p.addEventListener('click', () => Book.toggle(i));
+          p._bound = true;
+        }
+      });
 
-  6) The book is a 3D transform container (.book) with individual .page elements.
-     A page toggles .open to animate a Y-rotation flip (forward/back).
+      // auto-reveal by flipping previous
+      const last = State.pages.length - 1;
+      const prev = last - 1;
+      if (prev >= 0) {
+        const prevPage = State.pages[prev];
+        if (prevPage && !prevPage.classList.contains('open')) {
+          prevPage.classList.add('open');
+          State.flipped.add(prev);
+          State.currentIndex = last;
+          AudioMgr.playPage();
+        }
+      }
+    }
+  };
 
-  7) Optional enhancements you can add later:
-     - Soft dust particles overlay.
-     - Parchment edge overlays for corners.
-     - Soundscape switching by plane (ambient tracks mapped to page groups).
-     - Progress reflection on the back page (a subtle glow or glyph accumulation).
+  /* ──────────────────────────────────────────────────────────────────────
+     6) LOCK / UNLOCK SYSTEM
+     ──────────────────────────────────────────────────────────────────── */
+  const Locks = {
+    refreshLockBadges() {
+      // If you have a sidebar TOC of <a class="toc" data-file="..."> links,
+      // mark them as locked / unlocked.
+      U.qa('a.toc').forEach(a => {
+        const file = a.getAttribute('data-file');
+        if (!file) return;
+        let tag = a.querySelector('.locked-tag');
+        if (U.isUnlocked(file)) {
+          a.classList.remove('locked-link');
+          if (tag) tag.remove();
+        } else {
+          a.classList.add('locked-link');
+          if (!tag) {
+            const span = document.createElement('span');
+            span.className = 'locked-tag';
+            span.textContent = ' (locked)';
+            a.appendChild(span);
+          }
+        }
+      });
+    },
 
-  8) Deployment:
-     - GitHub Pages: enable Pages on the repository (main branch / root).
-     - Custom domain: add a CNAME file at repo root and point DNS to Pages.
+    setInitialUnlocks() {
+      // Always unlocked
+      CFG.ALWAYS_UNLOCKED.forEach(f => U.unlock(f));
+      // cache
+      State.unlockedCache = new Set(
+        Object.keys(localStorage)
+          .filter(k => k.startsWith('u_') && localStorage.getItem(k) === '1')
+          .map(k => k.slice(2))
+      );
+    },
 
-  9) Performance:
-     - Use compressed JPG/AVIF for large textures.
-     - Keep seal_glow.png under ~300–800KB; transparent PNG recommended.
-     - Defer other heavy assets until those entries are opened.
+    unlockByRune(runeWord) {
+      const list = CFG.RUNES[runeWord];
+      if (!list) return false;
+      U.unlockMany(list);
+      Overlays.showSeal();
+      Locks.refreshLockBadges();
+      Finale.maybeTrigger();
+      return true;
+    },
 
-  10) Content writing:
-     - Entries use plain HTML. Keep them atmospheric and readable.
-     - Avoid spoilers in the main body; place reveals in sealed pages.
+    unlockAllByTrueName() {
+      U.unlockAllKnown();
+      Overlays.showSeal();
+      Locks.refreshLockBadges();
+      Finale.maybeTrigger();
+    }
+  };
 
-  11) Accessibility:
-     - Header, nav, main, section, footer semantics are present.
-     - aria-labels used to clarify purpose.
-     - Focus order remains logical; the book does not trap focus.
+  /* ──────────────────────────────────────────────────────────────────────
+     7) RUNE INPUT HANDLER
+     ──────────────────────────────────────────────────────────────────── */
+  const Runes = {
+    attempt(inputValRaw) {
+      const word = (inputValRaw || '').toUpperCase().trim();
+      if (!word) return;
 
-  12) Security:
-     - Static site, no user data is stored beyond localStorage.
-     - Runes simply set flags in localStorage; no network calls are required.
+      // True Name removes all seals
+      if (word.replace(/\s+/g, '') === 'VAELINTHORNE') {
+        Locks.unlockAllByTrueName();
+        return;
+      }
 
-  FUTURE PLACEHOLDER LINES FOR YOUR OWN NOTES
-  -------------------------------------------
-  A) Plane of Air NPCs:
-     - Sky-Shepherd Ilvara
-     - Glasswright Orrin
-     - Wind-Herder Keth
-  B) Plane of Fire NPCs:
-     - Ember Notary Resh
-     - Bronze Archivist Tal
-     - Brimstone Broker Ijz
-  C) Plane of Water NPCs:
-     - Bell-Keeper Rhue
-     - Cuttle-Scribe Laani
-     - Tide-Cartographer Plel
-  D) Plane of Earth NPCs:
-     - Fault-Teller Borha
-     - Stone-Singer Vekk
-     - Igneous Shepherd Nula
-  E) Abyssal NPC fragments:
-     - The Echo of a Name
-     - A Candle That Remembers Storms
-     - A Jaw Made of Prayer
+      // Normal runes
+      const ok = Locks.unlockByRune(word);
+      if (!ok) {
+        State.attempts++;
+        Overlays.scare();
+        if (State.attempts >= 3) {
+          State.sealedHard = true;
+          alert('The Chronicle seals itself shut until the next dawn…');
+        }
+      }
+    },
 
-  OPTIONS TO EXTEND THE TOC (ADD MORE LIST ITEMS)
-  -----------------------------------------------
-  - Add alternate chapters for each plane (4–6 per plane).
-  - Add sidebar links for equipment, relics, and armory pages.
-  - Add a mini “Maps” section with static images as pages.
+    bindControls() {
+      State.runeInput = U.$(CFG.IDS.runeInput);
+      State.runeBtn = U.$(CFG.IDS.runeBtn);
+      if (State.runeBtn) {
+        State.runeBtn.addEventListener('click', (evt) => {
+          evt.preventDefault();
+          const v = State.runeInput ? State.runeInput.value : '';
+          Runes.attempt(v);
+          if (State.runeInput) State.runeInput.value = '';
+        });
+      }
+      if (State.runeInput) {
+        State.runeInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            const v = State.runeInput.value;
+            Runes.attempt(v);
+            State.runeInput.value = '';
+          }
+        });
+      }
+    }
+  };
 
-  STYLE HOOKS (REFERENCE)
-  -----------------------
-  body            : parchment background from style.css
-  header          : gradient, serif title
-  aside           : sticky sidebar container
-  .rune-panel     : input/button for runes
-  .book           : 3D perspective container
-  .page           : 50% width sheet, flip on .open
-  .seal, .scare   : overlays for seals & wrong-runed attempts
+  /* ──────────────────────────────────────────────────────────────────────
+     8) ENTRY LOADER
+     ──────────────────────────────────────────────────────────────────── */
+  const Entries = {
+    bindTOC() {
+      U.qa('a.toc').forEach(a => {
+        a.addEventListener('click', async (evt) => {
+          evt.preventDefault();
+          const file = a.getAttribute('data-file');
+          const title = a.textContent.replace(' (locked)', '');
+          if (!file) return;
 
-  This block intentionally remains verbose so the overall document
-  is about 500 lines, giving you space to annotate and grow.
-  -->
-</body>
-</html>
+          if (!U.isUnlocked(file)) {
+            Overlays.scare();
+            return;
+          }
+
+          try {
+            const html = await Entries.fetchEntry(file);
+            Book.appendEntryPage(title, html);
+          } catch (e) {
+            U.warn('Failed to fetch entry:', file, e);
+          }
+        });
+      });
+    },
+
+    async fetchEntry(file) {
+      const res = await fetch('entries/' + file, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.text();
+    }
+  };
+
+  /* ──────────────────────────────────────────────────────────────────────
+     9) EASTER EGGS (SILENT)
+     ──────────────────────────────────────────────────────────────────── */
+  const Easter = {
+    titleClickCount: 0,
+    init() {
+      if (!CFG.EASTER.enabled) return;
+      State.titleEl = U.$(CFG.IDS.title) || U.q('header h1');
+      if (State.titleEl) {
+        State.titleEl.addEventListener('click', () => {
+          Easter.titleClickCount++;
+          if (Easter.titleClickCount >= CFG.EASTER.titleClicksForPrompt) {
+            Easter.titleClickCount = 0;
+            const name = prompt('The margin whispers: Your True Name?');
+            if ((name || '').replace(/\s+/g, '').toUpperCase() === 'VAELINTHORNE') {
+              Locks.unlockAllByTrueName();
+            } else {
+              Overlays.scare();
+            }
+          }
+        });
+      }
+
+      // Random whisper loop (no hints)
+      setInterval(() => {
+        if (Math.random() < CFG.EASTER.randomWhisperChance) {
+          AudioMgr.playWhisper(0.28);
+        }
+      }, CFG.EASTER.randomWhisperIntervalMs);
+
+      // “Hidden” interactions can be expanded here if desired.
+      // Keep them atmospheric only; no UI hints.
+    }
+  };
+
+  /* ──────────────────────────────────────────────────────────────────────
+     10) FINALE
+     ──────────────────────────────────────────────────────────────────── */
+  const Finale = {
+    maybeTrigger() {
+      if (!U.canFinale()) return;
+
+      // Dramatic blue seal + fade to finale target
+      setTimeout(() => {
+        if (!State.sealOverlay) return;
+        State.sealOverlay.classList.remove('hidden');
+        State.sealOverlay.classList.add('show');
+        AudioMgr.playSeal();
+
+        setTimeout(() => {
+          State.sealOverlay.classList.remove('show');
+          setTimeout(() => State.sealOverlay.classList.add('hidden'), 500);
+          // fade to black + redirect
+          const fade = document.createElement('div');
+          Object.assign(fade.style, {
+            position: 'fixed', inset: '0', background: '#000',
+            opacity: '0', transition: 'opacity 2.5s ease', zIndex: '2000'
+          });
+          document.body.appendChild(fade);
+          requestAnimationFrame(() => {
+            fade.style.opacity = '1';
+            setTimeout(() => { window.location.href = CFG.FINALE_TARGET; }, 2600);
+          });
+        }, 1600);
+      }, 600);
+    }
+  };
+
+  /* ──────────────────────────────────────────────────────────────────────
+     11) DEV CONSOLE (OPTIONAL)
+     ──────────────────────────────────────────────────────────────────── */
+  const Dev = {
+    build() {
+      if (!CFG.DEV.enabled) return;
+      const box = document.createElement('div');
+      box.style.cssText = `
+        position: fixed; right: 8px; bottom: 8px; width: 340px; height: 200px;
+        background: rgba(0,0,0,.7); color: #cde; font-family: monospace; font-size: 12px;
+        border: 1px solid #456; border-radius: 6px; padding: 6px; z-index: 3000; display:none;
+      `;
+      const pre = document.createElement('pre');
+      pre.style.cssText = 'margin:0; height: 165px; overflow:auto;';
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; gap:6px; margin-top:4px;';
+      const input = document.createElement('input');
+      input.placeholder = 'Dev cmd... (ex: unlockAll)';
+      input.style.cssText = 'flex:1; background:#123; color:#cde; border:1px solid #345; border-radius:4px; padding:4px;';
+      const btn = document.createElement('button');
+      btn.textContent = 'Run';
+      btn.style.cssText = 'background:#246; color:#fff; border:0; padding:4px 8px; border-radius:4px; cursor:pointer;';
+      row.appendChild(input); row.appendChild(btn);
+      box.appendChild(pre); box.appendChild(row);
+      document.body.appendChild(box);
+
+      State.devConsole = {
+        el: box, logEl: pre, input, open: false,
+        write(msg) {
+          const line = document.createElement('div');
+          line.textContent = String(msg);
+          pre.appendChild(line);
+          pre.scrollTop = pre.scrollHeight;
+        },
+        toggle() {
+          this.open = !this.open;
+          box.style.display = this.open ? 'block' : 'none';
+        }
+      };
+
+      btn.addEventListener('click', () => Dev.run(input.value));
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') Dev.run(input.value); });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.shiftKey && (e.key === '`' || e.code === 'Backquote')) {
+          State.devConsole.toggle();
+        }
+      });
+
+      U.log('Dev console ready. Shift+` to toggle.');
+    },
+
+    run(cmd) {
+      if (!cmd) return;
+      const c = cmd.trim().toLowerCase();
+      if (c === 'unlockall') { Locks.unlockAllByTrueName(); State.devConsole.write('OK: unlockAll'); }
+      else if (c.startsWith('unlock ')) {
+        const rune = c.split(' ')[1]?.toUpperCase();
+        if (rune && CFG.RUNES[rune]) { Locks.unlockByRune(rune); State.devConsole.write('OK: unlock ' + rune); }
+        else State.devConsole.write('Unknown rune: ' + rune);
+      }
+      else if (c === 'finale') { Finale.maybeTrigger(); State.devConsole.write('Finale attempted'); }
+      else if (c.startsWith('open ')) {
+        const f = c.slice(5);
+        Entries.fetchEntry(f).then(html => {
+          Book.appendEntryPage(f, html);
+          State.devConsole.write('Opened: ' + f);
+        }).catch(() => State.devConsole.write('Failed to open: ' + f));
+      }
+      else State.devConsole.write('Unknown cmd: ' + c);
+      State.devConsole.input.value = '';
+    }
+  };
+
+  /* ──────────────────────────────────────────────────────────────────────
+     12) SAFETY / WIRING CHECKS
+     ──────────────────────────────────────────────────────────────────── */
+  function checkRequiredDOM() {
+    const missing = [];
+    if (!(State.bookEl = U.$(CFG.IDS.book))) missing.push('#' + CFG.IDS.book);
+    if (!(State.sealOverlay = U.$(CFG.IDS.sealOverlay))) missing.push('#' + CFG.IDS.sealOverlay);
+    if (!(State.scareOverlay = U.$(CFG.IDS.scareOverlay))) missing.push('#' + CFG.IDS.scareOverlay);
+    State.runeInput = U.$(CFG.IDS.runeInput);
+    State.runeBtn = U.$(CFG.IDS.runeBtn);
+
+    if (missing.length) {
+      U.warn('Missing DOM elements:', missing.join(', '));
+    }
+  }
+
+  function checkAssets() {
+    // simple HEAD requests are blocked for file:// — rely on runtime errors.
+    U.ensureAssets();
+  }
+
+  /* ──────────────────────────────────────────────────────────────────────
+     13) INIT
+     ──────────────────────────────────────────────────────────────────── */
+  async function init() {
+    // Bind ambient audio to first user click
+    window.addEventListener('click', AudioMgr.playAmbientOnce, { once: true });
+
+    checkRequiredDOM();
+    checkAssets();
+    AudioMgr.init();
+    Dev.build();
+
+    // Book pages present at load
+    Book.init();
+
+    // Locks and TOC
+    Locks.setInitialUnlocks();
+    Locks.refreshLockBadges();
+    Entries.bindTOC();
+
+    // Runes
+    Runes.bindControls();
+
+    // Easter eggs (silent)
+    Easter.init();
+
+    // If all requirements already satisfied (from previous session), trigger finale
+    setTimeout(() => Finale.maybeTrigger(), 800);
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+
+  /* ──────────────────────────────────────────────────────────────────────
+     14) OPTIONAL: PUBLIC API (for console)
+     ──────────────────────────────────────────────────────────────────── */
+  window.__Chronicle = {
+    attemptRune: (w) => Runes.attempt(w),
+    openEntry: async (file) => {
+      if (!U.isUnlocked(file)) return Overlays.scare();
+      const html = await Entries.fetchEntry(file);
+      Book.appendEntryPage(file, html);
+    },
+    unlockAll: () => Locks.unlockAllByTrueName(),
+    unlockRune: (r) => Locks.unlockByRune((r || '').toUpperCase()),
+    finale: () => Finale.maybeTrigger(),
+  };
+
+  /* ──────────────────────────────────────────────────────────────────────
+     15) STYLISTIC EXTRAS (OPTIONAL HOOKS)
+     ──────────────────────────────────────────────────────────────────── */
+  // These can be used by CSS to reflect progress subtly (no spoilers).
+  function reflectProgressGlow() {
+    const req = U.listAllRequired();
+    let count = 0; req.forEach(f => { if (U.isUnlocked(f)) count++; });
+    const ratio = req.size ? count / req.size : 0;
+    if (State.bookEl) {
+      State.bookEl.style.boxShadow = `0 0 ${Math.floor(10 + ratio * 60)}px ${Math.floor(ratio * 24)}px rgba(94,203,255,${0.2 + ratio * 0.5})`;
+    }
+  }
+  setInterval(reflectProgressGlow, 4000);
+})();
