@@ -1,39 +1,483 @@
+/* ================================================================
+   THE NAMELESS CHRONICLE — BOOK EDITION STYLE SHEET
+   Version 10.3 | Author: Vaelin Thorne
+   ================================================================
+   Summary:
+   - Magical journal / book aesthetic
+   - Parchment textures, 3D pages, glowing runes
+   - Rune seal + scare overlays
+   - Smooth animations and flicker effects
+   ================================================================ */
 
-:root{ --bg:#110d0a; --parch:#f4ecd8; --ink:#2a1a10; --accent:#7a4b1e; }
-*{box-sizing:border-box}
-body{ margin:0; font-family: Georgia, 'Times New Roman', serif; background: radial-gradient(60% 60% at 20% 15%, #23180f, #0a0806); color:var(--ink);}
-header{ background: linear-gradient(180deg,#2e2016,#1a120c); color:#f3e5d7; padding:28px; text-align:center; border-bottom:1px solid #4b3623; cursor: pointer;}
-header h1{ margin:0 0 6px 0; letter-spacing:1px }
-header .subtitle{ opacity:.85; margin:0 }
-main{ display:flex; gap:18px; max-width:1200px; margin:20px auto; padding:0 18px; }
-aside{ width:280px; background:#1e1510; color:#e9d7c3; border:1px solid #4b3623; border-radius:8px; padding:14px; height:fit-content; position:sticky; top:12px; }
-aside a{ color:#ffdcb3; text-decoration:none }
-.pages{ flex:1 }
-.pages h2{ margin:18px 0 8px; color:#3a2516; background:linear-gradient(180deg,#efe5cd,#e6d6b6); padding:10px 12px; border:1px solid #c8b596; border-radius:6px }
-ol{ list-style:decimal; margin:8px 0 22px 24px; padding:0 }
-ol li{ margin:6px 0 }
-.page-link{ color:#4a2a13; text-decoration:none; border-bottom:1px dashed #a57a4a }
-article{ background:linear-gradient(180deg, rgba(255,252,240,.98), rgba(244,230,204,.98)); padding:24px; border-radius:8px; border:8px solid transparent; box-shadow:0 10px 30px rgba(0,0,0,.5); margin:18px 0 }
-article h1{ margin-top:0 }
-footer{ color:#cdbda8; text-align:center; padding:20px 10px }
+/* === ROOT COLORS & VARIABLES === */
+:root {
+  --bg: #0b0907;
+  --parchment: #f4ecd8;
+  --ink: #2a1a10;
+  --accent: #7a4b1e;
+  --rune-glow: #1ecaff;
+  --seal-glow: #b41313;
+  --shadow: rgba(0, 0, 0, 0.8);
+  --light: rgba(255, 255, 200, 0.4);
+  --page-border: #c0b498;
+  --header-height: 80px;
+}
 
-/* Locks + Seal + Scare */
-.rune-panel{ margin-top:14px; background:#261a12; border:1px solid #5a3c25; border-radius:8px; padding:10px; }
-.rune-panel input{ width:100%; padding:8px; border:none; border-radius:4px; margin-bottom:6px; }
-.rune-panel button{ width:100%; padding:8px; border:none; border-radius:4px; background:#8b5a2b; color:#fff; cursor:pointer }
-.hint.sm{ opacity:.7; font-size:.9em }
-.locked-tag{ font-size:12px; color:#a36a3a; margin-left:6px; opacity:.9 }
-.locked-link{ opacity:.6; pointer-events:auto; }
-.locked-link:hover{ text-decoration:line-through; }
+/* === BASIC RESET === */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-.seal{ position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:1000; opacity:0; transition:opacity .2s ease; }
-.seal .wax{ width:220px; height:220px; border-radius:50%; background: radial-gradient(#7b2015, #4a0e08); box-shadow: 0 0 40px rgba(255,160,80,.35), inset 0 0 30px rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; color:#f3e0cc; letter-spacing:2px; font-weight:bold; transform: scale(.6) rotate(-6deg); animation: waxpop .9s ease forwards; }
-@keyframes waxpop{ 50%{ transform: scale(1.05) rotate(0deg);} 100%{ transform: scale(.2) rotate(12deg); opacity:0;} }
-.seal.hidden{ display:none; }
-.seal.show{ opacity:1; }
+/* === BODY === */
+body {
+  background: radial-gradient(50% 60% at 20% 10%, #1a120c, #050403);
+  background-image: url("assets/images/parchment_bg.jpg");
+  background-size: cover;
+  background-repeat: repeat;
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: "Georgia", "Times New Roman", serif;
+  line-height: 1.7;
+  overflow-x: hidden;
+}
 
-.scare{ position:fixed; inset:0; background:rgba(190,0,0,.0); display:flex; align-items:center; justify-content:center; z-index:1001; transition: background 80ms ease; }
-.scare.hidden{ display:none; }
-.scare.on{ background:rgba(190,0,0,.75); }
-.scare-text{ color:#ffece0; font-size:2rem; text-shadow:0 0 16px #ffb3a3, 0 0 4px #000; opacity:0; transform:scale(.8); transition:opacity 60ms ease, transform 60ms ease; }
-.scare.on .scare-text{ opacity:1; transform:scale(1.04); }
+/* === HEADER === */
+header {
+  background: linear-gradient(180deg, #2e2016 0%, #1a120c 100%);
+  border-bottom: 2px solid #4b3623;
+  text-align: center;
+  padding: 28px;
+  color: #f3e5d7;
+  text-shadow: 0 0 10px rgba(255, 220, 160, 0.2);
+  cursor: pointer;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+header h1 {
+  font-size: 2rem;
+  margin-bottom: 4px;
+  letter-spacing: 2px;
+  animation: titlePulse 6s infinite;
+}
+
+header .subtitle {
+  font-size: 1.1rem;
+  opacity: 0.8;
+  font-style: italic;
+}
+
+@keyframes titlePulse {
+  0%, 100% {
+    text-shadow: 0 0 6px rgba(255, 180, 120, 0.1);
+  }
+  50% {
+    text-shadow: 0 0 20px rgba(255, 180, 120, 0.3);
+  }
+}
+
+/* === MAIN LAYOUT === */
+main {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  padding: 20px;
+  margin: auto;
+  max-width: 1600px;
+}
+
+/* === SIDEBAR === */
+aside {
+  width: 320px;
+  background: rgba(25, 18, 12, 0.9);
+  border: 2px solid #4b3623;
+  border-radius: 10px;
+  color: #e9d7c3;
+  padding: 20px;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  height: fit-content;
+  position: sticky;
+  top: 110px;
+}
+
+aside h3,
+aside h4 {
+  color: #ffdeaa;
+  margin-bottom: 10px;
+  letter-spacing: 1px;
+  text-shadow: 0 0 6px rgba(255, 200, 150, 0.3);
+}
+
+aside ol {
+  list-style: decimal;
+  padding-left: 20px;
+  margin-bottom: 20px;
+}
+
+aside li {
+  margin: 5px 0;
+}
+
+aside a.toc {
+  color: #ffdcb3;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+aside a.toc:hover {
+  color: #fff3d2;
+  text-shadow: 0 0 6px rgba(255, 240, 200, 0.5);
+}
+
+/* === RUNE PANEL === */
+.rune-panel {
+  background: #261a12;
+  border: 1px solid #5a3c25;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 18px;
+  text-align: center;
+}
+
+.rune-panel input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 5px;
+  border: none;
+  margin-bottom: 8px;
+  font-family: inherit;
+  text-align: center;
+  background: #3a271a;
+  color: #ffe9c0;
+}
+
+.rune-panel button {
+  width: 100%;
+  padding: 8px;
+  border: none;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #8b5a2b, #c2854f);
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rune-panel button:hover {
+  background: linear-gradient(90deg, #c2854f, #8b5a2b);
+  transform: scale(1.02);
+}
+
+/* === BOOK CONTAINER === */
+.pages {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.book {
+  position: relative;
+  width: 1000px;
+  height: 600px;
+  perspective: 2500px;
+  transform-style: preserve-3d;
+  transition: box-shadow 2s ease;
+  box-shadow: 0 0 0px 0px transparent;
+}
+
+.page {
+  position: absolute;
+  width: 50%;
+  height: 100%;
+  background: var(--parchment);
+  background-image: url("assets/images/parchment_bg.jpg");
+  background-size: cover;
+  border: 2px solid var(--page-border);
+  border-radius: 0 8px 8px 0;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3);
+  transform-origin: left;
+  transform-style: preserve-3d;
+  transition: transform 1.4s cubic-bezier(0.77, 0, 0.175, 1), box-shadow 1s ease;
+  z-index: 1;
+  padding: 40px;
+  overflow-y: auto;
+}
+
+.page:nth-child(even) {
+  transform-origin: right;
+  border-radius: 8px 0 0 8px;
+}
+
+.page.open {
+  transform: rotateY(-180deg);
+  z-index: 0;
+  box-shadow: -10px 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.page h1,
+.page h2 {
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+.page p {
+  margin-bottom: 10px;
+  font-size: 1.05rem;
+}
+
+/* === PAGE ANIMATION === */
+.page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.2));
+  opacity: 0;
+  transition: opacity 0.8s ease;
+  pointer-events: none;
+}
+
+.page.open::before {
+  opacity: 0.6;
+}
+
+.page:hover::before {
+  opacity: 0.3;
+}
+
+/* === SEAL OVERLAY === */
+.seal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.seal.hidden {
+  display: none;
+}
+
+.seal.show {
+  opacity: 1;
+}
+
+.seal .rune {
+  width: 220px;
+  height: 220px;
+  background: url("assets/images/seal_glow.png") center/contain no-repeat;
+  animation: runeBurst 1.3s ease forwards;
+  filter: drop-shadow(0 0 40px var(--rune-glow));
+}
+
+@keyframes runeBurst {
+  0% {
+    transform: scale(0.5) rotate(0deg);
+    opacity: 0;
+  }
+  20% {
+    transform: scale(1.1) rotate(20deg);
+    opacity: 1;
+  }
+  70% {
+    transform: scale(1.4) rotate(-15deg);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(0.05) rotate(25deg);
+    opacity: 0;
+  }
+}
+
+/* === SCARE OVERLAY === */
+.scare {
+  position: fixed;
+  inset: 0;
+  background: rgba(190, 0, 0, 0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  transition: background 120ms ease;
+}
+
+.scare.hidden {
+  display: none;
+}
+
+.scare.on {
+  background: rgba(190, 0, 0, 0.75);
+}
+
+.scare-text {
+  color: #ffece0;
+  font-size: 2.2rem;
+  text-shadow: 0 0 16px #ffb3a3, 0 0 4px #000;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 80ms ease, transform 80ms ease;
+}
+
+.scare.on .scare-text {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* === FOOTER === */
+footer {
+  text-align: center;
+  color: #cdbda8;
+  font-size: 0.9rem;
+  padding: 20px;
+  margin-top: 40px;
+}
+
+/* === SCROLLBARS === */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4b3623;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a120c;
+}
+
+/* === BOOK EDGE / SHADOW === */
+.book::before,
+.book::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 25px;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.4), transparent);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.book::after {
+  right: 0;
+  left: auto;
+  transform: scaleX(-1);
+}
+
+/* === EASTER EGG GLOWS (subtle) === */
+@keyframes pageGlow {
+  0%, 100% {
+    box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.05);
+  }
+  50% {
+    box-shadow: inset 0 0 40px rgba(255, 255, 200, 0.2);
+  }
+}
+
+.page.easter {
+  animation: pageGlow 6s infinite;
+}
+
+/* === BACKLIGHT GLOW ON UNLOCK === */
+@keyframes sealPulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 50px rgba(255, 50, 0, 0.5);
+  }
+}
+
+.book.unlocked {
+  animation: sealPulse 3s infinite;
+}
+
+/* === PAGE TURNING DEPTH === */
+.page.open ~ .page {
+  transform: translateX(-2px);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+/* === FLIPBOOK SPINE === */
+.book::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 8px;
+  top: 0;
+  bottom: 0;
+  background: radial-gradient(circle, #3a271a, #1a120c);
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+  transform: translateX(-50%);
+}
+
+/* === DISABLED STATES === */
+.book.sealed .page {
+  filter: grayscale(0.8) brightness(0.6);
+  pointer-events: none;
+  transition: filter 0.4s ease;
+}
+
+/* === ACCESSIBILITY === */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+/* === MISC EFFECTS === */
+@keyframes flicker {
+  0%, 100% { opacity: 0.95; }
+  40% { opacity: 0.9; }
+  70% { opacity: 0.98; }
+  90% { opacity: 0.85; }
+}
+
+header, .rune-panel {
+  animation: flicker 10s infinite ease-in-out;
+}
+
+/* === RESPONSIVE DESIGN === */
+@media (max-width: 1200px) {
+  main { flex-direction: column; }
+  aside {
+    width: 100%;
+    position: relative;
+    top: 0;
+  }
+  .book {
+    width: 100%;
+    height: auto;
+  }
+}
+
+/* === PLACEHOLDER ANIMATIONS FOR SECRET STATES === */
+@keyframes divineLight {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 10px rgba(255,255,255,0.2)); }
+  50% { filter: brightness(1.3) drop-shadow(0 0 30px rgba(255,255,200,0.5)); }
+}
+
+.page.holy {
+  animation: divineLight 8s infinite;
+}
+
+@keyframes abyssalDark {
+  0%, 100% { filter: brightness(0.9) drop-shadow(0 0 5px rgba(50,0,0,0.3)); }
+  50% { filter: brightness(0.6) drop-shadow(0 0 25px rgba(150,0,0,0.6)); }
+}
+
+.page.corrupted {
+  animation: abyssalDark 8s infinite;
+}
